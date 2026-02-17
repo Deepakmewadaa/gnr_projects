@@ -237,30 +237,7 @@ This project:
 - Automatically installs dependencies
 - Can be built on any Windows machine with VS Build Tools + CMake
 
----
 
-# Notes
-
-Do NOT commit:
-```
-build/
-Release/
-*.pyd
-*.exe
-```
-
-Only commit:
-```
-framework/
-bindings.cpp
-train.cpp
-evaluate.cpp
-CMakeLists.txt
-vcpkg.json
-README.md
-```
-
----
 
 # Author
 
