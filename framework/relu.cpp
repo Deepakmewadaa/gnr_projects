@@ -1,6 +1,6 @@
 #include "relu.h"
 #include <algorithm>
-
+// RELU
 Tensor ReLU::forward(Tensor &input) {
     input_cache = input;
 
