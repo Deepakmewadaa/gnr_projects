@@ -1,0 +1,9 @@
+{
+  "name": "customdl",
+  "version": "0.1.0",
+  "dependencies": [
+    "opencv4",
+    "protobuf",
+    "pybind11"
+  ]
+}

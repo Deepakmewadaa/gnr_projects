@@ -255,6 +255,7 @@ int main(int argc, char* argv[]) {
     int batch_size = 64;
 
     for (int epoch = 0; epoch < epochs; epoch++) {
+        
 
         float total_loss = 0;
         float total_acc  = 0;
