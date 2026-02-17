@@ -12,9 +12,8 @@
 #include "framework/loss.h"
 #include "framework/optimizer.h"
 
-// ------------------------------------------------------------
 // ACCURACY
-// ------------------------------------------------------------
+
 float compute_accuracy(Tensor &logits,
                        std::vector<int> &labels) {
 
@@ -45,9 +44,8 @@ float compute_accuracy(Tensor &logits,
     return (float)correct / batch;
 }
 
-// ------------------------------------------------------------
 // CNN MODEL
-// ------------------------------------------------------------
+
 class CNN {
 public:
 
@@ -106,9 +104,8 @@ public:
     }
 };
 
-// ------------------------------------------------------------
 // PARAM COUNT
-// ------------------------------------------------------------
+
 int count_parameters(std::vector<Tensor*> params) {
 
     int total = 0;
@@ -119,9 +116,9 @@ int count_parameters(std::vector<Tensor*> params) {
     return total;
 }
 
-// ------------------------------------------------------------
+
 // MACs
-// ------------------------------------------------------------
+
 long long compute_macs(CNN &model,
                        int channels,
                        int input_size) {
@@ -189,9 +186,8 @@ long long compute_macs(CNN &model,
     return total_macs;
 }
 
-// ------------------------------------------------------------
-// MAIN
-// ------------------------------------------------------------
+
+
 int main(int argc, char* argv[]) {
 
     if (argc < 3) {
@@ -207,9 +203,8 @@ int main(int argc, char* argv[]) {
     std::cout << "Dataset size: "
               << dataset.size() << "\n";
 
-    // --------------------------------------------------------
+
     // Train/Test Split (80/20)
-    // --------------------------------------------------------
     int total_size = dataset.size();
     int train_size = (int)(0.8f * total_size);
 
@@ -265,7 +260,7 @@ int main(int argc, char* argv[]) {
         float total_acc  = 0;
         int batches = 0;
 
-        // ---------------- TRAIN ----------------
+
         for (int i = 0;
              i < train_size;
              i += batch_size) {
@@ -348,7 +343,7 @@ int main(int argc, char* argv[]) {
 
         float train_acc = total_acc / batches;
 
-        // ---------------- TEST ----------------
+
         float test_acc = 0;
         int test_batches = 0;
 
