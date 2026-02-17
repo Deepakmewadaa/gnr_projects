@@ -174,6 +174,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </ProjectReference>
+    <ProjectReference Include="D:\testing\build\evaluate.vcxproj">
+      <Project>{E5094364-3969-352A-8184-7AE006AEF0D2}</Project>
+      <Name>evaluate</Name>
+    </ProjectReference>
     <ProjectReference Include="D:\testing\build\train.vcxproj">
       <Project>{5E023AAA-AC23-35C7-BBA0-368ACEAA2F28}</Project>
       <Name>train</Name>

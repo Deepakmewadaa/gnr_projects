@@ -5,6 +5,9 @@
       <FullPath>D:\testing\build\x64\Release\ZERO_CHECK</FullPath>
     </ProjectOutput>
     <ProjectOutput>
+      <FullPath>D:\testing\build\Release\evaluate.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
       <FullPath>D:\testing\build\Release\train.exe</FullPath>
     </ProjectOutput>
     <ProjectOutput>

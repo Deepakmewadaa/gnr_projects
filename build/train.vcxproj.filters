@@ -28,6 +28,9 @@
     <ClCompile Include="D:\testing\framework\tensor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="D:\testing\framework\weight_io.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="D:\testing\CMakeLists.txt" />

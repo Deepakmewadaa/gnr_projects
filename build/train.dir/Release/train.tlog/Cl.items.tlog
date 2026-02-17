@@ -7,3 +7,4 @@ D:\testing\framework\maxpool.cpp;D:\testing\build\train.dir\Release\maxpool.obj
 D:\testing\framework\optimizer.cpp;D:\testing\build\train.dir\Release\optimizer.obj
 D:\testing\framework\relu.cpp;D:\testing\build\train.dir\Release\relu.obj
 D:\testing\framework\tensor.cpp;D:\testing\build\train.dir\Release\tensor.obj
+D:\testing\framework\weight_io.cpp;D:\testing\build\train.dir\Release\weight_io.obj

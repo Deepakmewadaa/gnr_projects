@@ -1,9 +1,9 @@
 #include <iostream>
 #include <fstream>
-#include <sstream>
-#include <map>
 #include <vector>
 #include <random>
+#include <algorithm>
+#include "framework/weight_io.h"
 #include "framework/dataset.h"
 #include "framework/conv2d.h"
 #include "framework/relu.h"
@@ -12,31 +12,9 @@
 #include "framework/loss.h"
 #include "framework/optimizer.h"
 
-
-std::map<std::string,std::string>
-load_config(std::string path) {
-
-    std::ifstream file(path);
-    std::map<std::string,std::string> config;
-
-    std::string line;
-
-    while (std::getline(file,line)) {
-
-        std::stringstream ss(line);
-        std::string key,value;
-
-        if (std::getline(ss,key,'=') &&
-            std::getline(ss,value)) {
-
-            config[key] = value;
-        }
-    }
-
-    return config;
-}
-
-
+// ------------------------------------------------------------
+// ACCURACY
+// ------------------------------------------------------------
 float compute_accuracy(Tensor &logits,
                        std::vector<int> &labels) {
 
@@ -45,15 +23,14 @@ float compute_accuracy(Tensor &logits,
 
     int correct = 0;
 
-    for (int b=0;b<batch;b++) {
+    for (int b = 0; b < batch; b++) {
 
         int best = 0;
         float best_val = -1e9;
 
-        for (int c=0;c<classes;c++) {
+        for (int c = 0; c < classes; c++) {
 
-            float val =
-                logits.data[b*classes + c];
+            float val = logits.data[b*classes + c];
 
             if (val > best_val) {
                 best_val = val;
@@ -68,38 +45,9 @@ float compute_accuracy(Tensor &logits,
     return (float)correct / batch;
 }
 
-
-void save_weights(std::vector<Tensor*> params,
-                  std::string filename) {
-
-    std::ofstream out(filename,
-                      std::ios::binary);
-
-    for (auto p : params) {
-        out.write(
-            reinterpret_cast<char*>(p->data.data()),
-            p->numel()*sizeof(float));
-    }
-
-    out.close();
-}
-
-void load_weights(std::vector<Tensor*> params,
-                  std::string filename) {
-
-    std::ifstream in(filename,
-                     std::ios::binary);
-
-    for (auto p : params) {
-        in.read(
-            reinterpret_cast<char*>(p->data.data()),
-            p->numel()*sizeof(float));
-    }
-
-    in.close();
-}
-
-
+// ------------------------------------------------------------
+// CNN MODEL
+// ------------------------------------------------------------
 class CNN {
 public:
 
@@ -113,18 +61,15 @@ public:
     Linear fc;
 
     CNN(int num_classes,
-        int in_channels,
-        int c1,
-        int c2,
-        int c3)
+        int in_channels)
     :
-      conv1(in_channels,c1,3),
-      conv2(c1,c2,3),
-      conv3(c2,c3,3),
+      conv1(in_channels, 16, 3),
+      conv2(16, 32, 3),
+      conv3(32, 64, 3),
       pool1(2),
       pool2(2),
       pool3(2),
-      fc(c3*2*2, num_classes) {}
+      fc(64*2*2, num_classes) {}
 
     Tensor forward(Tensor &x) {
 
@@ -142,9 +87,9 @@ public:
 
         int N = x.shape[0];
 
-        Tensor flat({N, fc.in_features});
+        Tensor flat({N, 64*2*2});
 
-        for (int i=0;i<x.numel();i++)
+        for (int i = 0; i < x.numel(); i++)
             flat.data[i] = x.data[i];
 
         return fc.forward(flat);
@@ -161,188 +106,308 @@ public:
     }
 };
 
+// ------------------------------------------------------------
+// PARAM COUNT
+// ------------------------------------------------------------
+int count_parameters(std::vector<Tensor*> params) {
 
+    int total = 0;
+
+    for (auto p : params)
+        total += p->numel();
+
+    return total;
+}
+
+// ------------------------------------------------------------
+// MACs
+// ------------------------------------------------------------
+long long compute_macs(CNN &model,
+                       int channels,
+                       int input_size) {
+
+    long long total_macs = 0;
+
+    int H = input_size;
+    int W = input_size;
+
+    // Conv1
+    {
+        int K = model.conv1.kernel_size;
+        int Cin = channels;
+        int Cout = model.conv1.out_channels;
+
+        int H_out = H - K + 1;
+        int W_out = W - K + 1;
+
+        total_macs +=
+            (long long)H_out * W_out *
+            Cout * (Cin * K * K);
+
+        H = H_out / 2;
+        W = W_out / 2;
+    }
+
+    // Conv2
+    {
+        int K = model.conv2.kernel_size;
+        int Cin = model.conv2.in_channels;
+        int Cout = model.conv2.out_channels;
+
+        int H_out = H - K + 1;
+        int W_out = W - K + 1;
+
+        total_macs +=
+            (long long)H_out * W_out *
+            Cout * (Cin * K * K);
+
+        H = H_out / 2;
+        W = W_out / 2;
+    }
+
+    // Conv3
+    {
+        int K = model.conv3.kernel_size;
+        int Cin = model.conv3.in_channels;
+        int Cout = model.conv3.out_channels;
+
+        int H_out = H - K + 1;
+        int W_out = W - K + 1;
+
+        total_macs +=
+            (long long)H_out * W_out *
+            Cout * (Cin * K * K);
+
+        H = H_out / 2;
+        W = W_out / 2;
+    }
+
+    total_macs +=
+        (long long)model.fc.in_features *
+        model.fc.out_features;
+
+    return total_macs;
+}
+
+// ------------------------------------------------------------
+// MAIN
+// ------------------------------------------------------------
 int main(int argc, char* argv[]) {
 
-    if (argc < 4) {
-
-        std::cout << "Usage:\n";
-        std::cout << "Train: ./train <dataset_path> <config_path> train\n";
-        std::cout << "Eval : ./train <dataset_path> <config_path> eval <weights>\n";
+    if (argc < 3) {
+        std::cout << "Usage: ./train <dataset_path> <num_classes>\n";
         return 1;
     }
 
     std::string dataset_path = argv[1];
-    std::string config_path  = argv[2];
-    std::string mode         = argv[3];
-
-    std::string weights_path;
-
-    if (mode == "eval") {
-        if (argc < 5) {
-            std::cout << "Provide weights path for eval\n";
-            return 1;
-        }
-        weights_path = argv[4];
-    }
-
+    int num_classes = std::stoi(argv[2]);
 
     ImageDataset dataset(dataset_path);
 
-    auto config = load_config(config_path);
+    std::cout << "Dataset size: "
+              << dataset.size() << "\n";
 
-    int num_classes =
-        std::stoi(config["num_classes"]);
+    // --------------------------------------------------------
+    // Train/Test Split (80/20)
+    // --------------------------------------------------------
+    int total_size = dataset.size();
+    int train_size = (int)(0.8f * total_size);
 
-    int epochs =
-        std::stoi(config["epochs"]);
+    std::vector<int> indices(total_size);
+    for (int i = 0; i < total_size; i++)
+        indices[i] = i;
 
-    int batch_size =
-        std::stoi(config["batch_size"]);
+    std::mt19937 rng(42);
+    std::shuffle(indices.begin(),
+                 indices.end(),
+                 rng);
 
-    float lr =
-        std::stof(config["learning_rate"]);
+    std::vector<int> train_indices(
+        indices.begin(),
+        indices.begin() + train_size);
 
-    int c1 =
-        std::stoi(config["conv1_out"]);
-    int c2 =
-        std::stoi(config["conv2_out"]);
-    int c3 =
-        std::stoi(config["conv3_out"]);
+    std::vector<int> test_indices(
+        indices.begin() + train_size,
+        indices.end());
 
-    CNN model(
-        num_classes,
-        dataset.channels,
-        c1,c2,c3
-    );
+    std::cout << "Train size: "
+              << train_indices.size() << "\n";
 
+    std::cout << "Test size: "
+              << test_indices.size() << "\n";
 
-    if (mode == "train") {
+    CNN model(num_classes,
+              dataset.channels);
 
-        SGD optimizer(model.parameters(),
-                      lr, 0.9f);
+    std::cout << "Total Parameters: "
+              << count_parameters(model.parameters())
+              << "\n";
 
-        for (int epoch=0;epoch<epochs;epoch++) {
+    long long macs =
+        compute_macs(model,
+                     dataset.channels,
+                     32);
 
-            float total_loss = 0;
-            float total_acc  = 0;
-            int batches = 0;
+    std::cout << "MACs (per image): "
+              << macs << "\n";
 
-            for (int i=0;
-                 i<dataset.size();
-                 i+=batch_size) {
+    std::cout << "FLOPs (per image): "
+              << 2 * macs << "\n";
 
-                Tensor batch_images;
-                std::vector<int> batch_labels;
+    SGD optimizer(model.parameters(), 0.02f, 0.9f);
 
-                dataset.get_batch(i,
-                                  batch_size,
-                                  batch_images,
-                                  batch_labels);
+    int epochs = 10;
+    int batch_size = 64;
 
-                optimizer.zero_grad();
+    for (int epoch = 0; epoch < epochs; epoch++) {
 
-                Tensor logits =
-                    model.forward(batch_images);
-
-                float loss =
-                    cross_entropy_forward(
-                        logits,
-                        batch_labels);
-
-                cross_entropy_backward(
-                    logits,
-                    batch_labels);
-
-                Tensor grad(logits.shape);
-
-                for (int k=0;k<logits.numel();k++)
-                    grad.data[k] = logits.grad[k];
-
-                grad = model.fc.backward(grad);
-
-                int N = batch_images.shape[0];
-
-                Tensor reshaped({N,c3,2,2});
-
-                for (int k=0;k<grad.numel();k++)
-                    reshaped.data[k] = grad.data[k];
-
-                grad = reshaped;
-
-                grad = model.pool3.backward(grad);
-                grad = model.relu3.backward(grad);
-                grad = model.conv3.backward(grad);
-
-                grad = model.pool2.backward(grad);
-                grad = model.relu2.backward(grad);
-                grad = model.conv2.backward(grad);
-
-                grad = model.pool1.backward(grad);
-                grad = model.relu1.backward(grad);
-                grad = model.conv1.backward(grad);
-
-                optimizer.step();
-
-                total_loss += loss;
-                total_acc  += compute_accuracy(
-                                logits,
-                                batch_labels);
-
-                batches++;
-            }
-
-            std::cout << "Epoch "
-                      << epoch+1
-                      << " | Loss: "
-                      << total_loss/batches
-                      << " | Acc: "
-                      << (total_acc/batches)*100
-                      << "%\n";
-        }
-
-        save_weights(model.parameters(),
-                     "model.bin");
-
-        std::cout << "Training Complete. "
-                  << "Weights saved to model.bin\n";
-    }
-
- 
-    else if (mode == "eval") {
-
-        load_weights(model.parameters(),
-                     weights_path);
-
-        float total_acc = 0;
+        float total_loss = 0;
+        float total_acc  = 0;
         int batches = 0;
 
-        for (int i=0;
-             i<dataset.size();
-             i+=batch_size) {
+        // ---------------- TRAIN ----------------
+        for (int i = 0;
+             i < train_size;
+             i += batch_size) {
 
-            Tensor batch_images;
+            int actual_batch =
+                std::min(batch_size,
+                         train_size - i);
+
+            Tensor batch_images(
+                {actual_batch,
+                 dataset.channels,
+                 32,32});
+
             std::vector<int> batch_labels;
 
-            dataset.get_batch(i,
-                              batch_size,
-                              batch_images,
-                              batch_labels);
+            int img_size =
+                dataset.channels * 32 * 32;
+
+            for (int b=0; b<actual_batch; b++) {
+
+                int idx = train_indices[i+b];
+
+                for (int k=0;k<img_size;k++)
+                    batch_images.data[b*img_size + k] =
+                        dataset.images[idx].data[k];
+
+                batch_labels.push_back(
+                    dataset.labels[idx]);
+            }
+
+            optimizer.zero_grad();
 
             Tensor logits =
                 model.forward(batch_images);
 
-            total_acc += compute_accuracy(
+            float loss =
+                cross_entropy_forward(
+                    logits,
+                    batch_labels);
+
+            cross_entropy_backward(
+                logits,
+                batch_labels);
+
+            Tensor grad(logits.shape);
+
+            for (int k=0;k<logits.numel();k++)
+                grad.data[k] = logits.grad[k];
+
+            grad = model.fc.backward(grad);
+
+            Tensor reshaped({actual_batch,64,2,2});
+
+            for (int k=0;k<grad.numel();k++)
+                reshaped.data[k] = grad.data[k];
+
+            grad = reshaped;
+
+            grad = model.pool3.backward(grad);
+            grad = model.relu3.backward(grad);
+            grad = model.conv3.backward(grad);
+
+            grad = model.pool2.backward(grad);
+            grad = model.relu2.backward(grad);
+            grad = model.conv2.backward(grad);
+
+            grad = model.pool1.backward(grad);
+            grad = model.relu1.backward(grad);
+            grad = model.conv1.backward(grad);
+
+            optimizer.step();
+
+            total_loss += loss;
+            total_acc  += compute_accuracy(
                             logits,
                             batch_labels);
 
             batches++;
         }
 
-        std::cout << "Test Accuracy: "
-                  << (total_acc/batches)*100
+        float train_acc = total_acc / batches;
+
+        // ---------------- TEST ----------------
+        float test_acc = 0;
+        int test_batches = 0;
+
+        for (int i=0;
+             i<test_indices.size();
+             i+=batch_size) {
+
+            int actual_batch =
+                std::min(batch_size,
+                         (int)test_indices.size() - i);
+
+            Tensor batch_images(
+                {actual_batch,
+                 dataset.channels,
+                 32,32});
+
+            std::vector<int> batch_labels;
+
+            int img_size =
+                dataset.channels * 32 * 32;
+
+            for (int b=0;b<actual_batch;b++) {
+
+                int idx = test_indices[i+b];
+
+                for (int k=0;k<img_size;k++)
+                    batch_images.data[b*img_size + k] =
+                        dataset.images[idx].data[k];
+
+                batch_labels.push_back(
+                    dataset.labels[idx]);
+            }
+
+            Tensor logits =
+                model.forward(batch_images);
+
+            test_acc += compute_accuracy(
+                            logits,
+                            batch_labels);
+
+            test_batches++;
+        }
+
+        std::cout << "Epoch "
+                  << epoch+1
+                  << " | Loss: "
+                  << total_loss/batches
+                  << " | Train Acc: "
+                  << train_acc*100
+                  << "% | Test Acc: "
+                  << (test_acc/test_batches)*100
                   << "%\n";
     }
+
+    save_weights(model.parameters(),
+                 "model.bin");
+
+    std::cout << "Training Complete. "
+              << "Weights saved to model.bin\n";
 
     return 0;
 }

@@ -1,0 +1,10 @@
+D:\testing\evaluate.cpp;D:\testing\build\evaluate.dir\Release\evaluate.obj
+D:\testing\framework\conv2d.cpp;D:\testing\build\evaluate.dir\Release\conv2d.obj
+D:\testing\framework\dataset.cpp;D:\testing\build\evaluate.dir\Release\dataset.obj
+D:\testing\framework\linear.cpp;D:\testing\build\evaluate.dir\Release\linear.obj
+D:\testing\framework\loss.cpp;D:\testing\build\evaluate.dir\Release\loss.obj
+D:\testing\framework\maxpool.cpp;D:\testing\build\evaluate.dir\Release\maxpool.obj
+D:\testing\framework\optimizer.cpp;D:\testing\build\evaluate.dir\Release\optimizer.obj
+D:\testing\framework\relu.cpp;D:\testing\build\evaluate.dir\Release\relu.obj
+D:\testing\framework\tensor.cpp;D:\testing\build\evaluate.dir\Release\tensor.obj
+D:\testing\framework\weight_io.cpp;D:\testing\build\evaluate.dir\Release\weight_io.obj
